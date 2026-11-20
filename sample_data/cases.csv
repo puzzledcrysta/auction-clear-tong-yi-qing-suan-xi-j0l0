@@ -1,0 +1,10 @@
+case,expected,evidence,可售数量,底价元,报价事件
+partial_award,120,乙 获配=3,10,5,乙:1:2:12:9;甲:1:4:18:7;丙:1:1:10:5
+time_before_identifier,36,乙 获配=2,3,5,甲:1:12:12:2;乙:1:11:12:2
+cancel_before_clear,45,甲=撤单,3,5,甲:2:3:20:0;乙:1:2:15:3;甲:1:1:20:3
+unsold_at_reserve,12.5,余量=5,10,2.5,甲:1:1:8:5;乙:1:2:2:5
+no_award,0,成交总数=0,6,7,甲:1:1:5:6
+revised_bid,40,统一清算价=10,4,5,甲:1:1:30:4;乙:1:3:10:4;甲:2:2:6:4
+same_rev_conflict,!AUCTION_CONFLICT,,5,10,甲:1:2:20:3;甲:1:2:20:4
+bad_record,!AUCTION_FORMAT,,5,10,甲:1:2:20
+negative_demand,!RANGE,,5,10,甲:1:2:20:-2
