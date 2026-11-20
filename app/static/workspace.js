@@ -24,7 +24,8 @@ function filterTable() {
   const query = filter.value.trim().toLocaleLowerCase();
   const selected = rows.filter(row => {
     if (stage === 'reconcile' && differences.checked && row.code === 'MATCH') return false;
-    return !query || [row.key,row.id,row.line,row.code,settings.reasons[row.code],row.detail,row.note,row.kind]
+    return !query || [row.key,row.id,row.line,row.code,row.target,row.status,
+      settings.reasons[row.code],row.detail,row.note,row.kind,row.reason]
       .some(value => String(value ?? '').toLocaleLowerCase().includes(query));
   });
   byId('shown').textContent = `${selected.length} / ${rows.length}`;
@@ -93,6 +94,7 @@ async function render() {
   const stage = selected;
   byId('phase').textContent = settings.tabs[stage];
   byId('review').hidden = true;
+  byId('correction').hidden = true;
   for (const link of links) {
     if (link.dataset.module === stage) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
@@ -150,6 +152,21 @@ async function render() {
         return button;
       }]];
       rows = runs;
+    } else if (stage === 'correction') {
+      const list = await query(`/api/corrections/${id}`);
+      view = [['冲销单','id', row => row.id.slice(0,9)], ['更正场次','target'], ['状态','status'],
+              ['登记 UTC','created'], ['发布 UTC','published'],
+              ['操作', row => correctionActions(row)]];
+      rows = list.corrections;
+      if (ticket === renderEpoch) {
+        byId('correction').hidden = false;
+        byId('correction-target').value = result.accepted[0]?.key || '';
+        const timeline = await query(`/api/review/${id}`);
+        const signed = timeline[0]?.decision === '确认';
+        byId('correction-hint').textContent = signed
+          ? '历史签核不可改写；本表单只登记晚到更正，并按更正影响另出冲销单。'
+          : '批次须先在「市场签核」以“确认”结论签核后，才能登记晚到更正。';
+      }
     } else {
       const timeline = await query(`/api/review/${id}`);
       view = [['版本','version','num'], ['结论','decision'], ['复核意见','note'], ['登记 UTC','changed']];
@@ -242,5 +259,115 @@ byId('review').addEventListener('submit', async event => {
     notice(error.message, true);
     if (error.status === 409) await render();
   }
+});
+
+function statusTag(text) {
+  return el('span', text, text === '已发布' ? 'state' : 'state problem');
+}
+
+function awardList(line) {
+  const wrap = el('details');
+  wrap.append(el('summary', '各买家获配调整'));
+  const list = el('ul');
+  for (const change of line.award_changes) {
+    list.append(el('li', `${change.bidder}：${change.old_quantity} → ${change.new_quantity}（${change.quantity_delta} ${change.unit}）`));
+  }
+  wrap.append(list);
+  return wrap;
+}
+
+function bookEvidence(check) {
+  const wrap = el('details');
+  wrap.append(el('summary', '外账按场核对'));
+  const list = el('ul');
+  const registered = [
+    ['登记时原签核金额', check.registered_old],
+    ['登记时更正后金额', check.registered_new],
+  ];
+  for (const [label, item] of registered) {
+    list.append(el('li', `${label}：${item.reference ?? '—'}（${settings.reasons[item.code] || item.code}）`));
+  }
+  if (check.publish) {
+    list.append(el('li', `发布重核更正后金额：${check.publish.reference ?? '—'}（${settings.reasons[check.publish.code] || check.publish.code}）`));
+  }
+  wrap.append(list);
+  return wrap;
+}
+
+function showCorrection(voucher) {
+  byId('evidence-key').textContent = voucher.correction_id.slice(0, 9);
+  const root = el('div', undefined, 'panel__body');
+  const head = el('p');
+  head.append(statusTag(voucher.status));
+  head.append(el('span', ` 目标场次 ${voucher.target} · 冲销合计 ${voucher.total_reversal} ${settings.unit}`));
+  root.append(head);
+  root.append(el('p', voucher.scope.delimitation, 'empty'));
+  for (const line of voucher.lines) {
+    const block = el('dl');
+    const title = el('dt');
+    title.append(el('strong', `场次 ${line.key}`));
+    block.append(title);
+    const dd = el('dd');
+    dd.append(el('div', `原签核金额 ${line.old_amount} → 更正后 ${line.new_amount}，冲销 ${line.reversal_amount} ${settings.unit}`));
+    dd.append(el('div', `统一清算价 ${line.old_clearing.value} → ${line.new_clearing.value}（${line.clearing_delta} ${line.old_clearing.unit}）`));
+    dd.append(awardList(line));
+    dd.append(bookEvidence(line.book_check));
+    block.append(dd);
+    root.append(block);
+  }
+  if (voucher.original_review?.length) {
+    const review = voucher.original_review[0];
+    root.append(el('p', `原签核：v${review.version} ${review.decision} · ${review.note}`, 'empty'));
+  }
+  byId('signal').replaceChildren(root);
+}
+
+function correctionActions(row) {
+  const cell = el('div');
+  const open = el('button', '查看冲销单', 'btn');
+  open.type = 'button';
+  open.addEventListener('click', async () => {
+    try { showCorrection(await query(`/api/correction/${row.id}`)); }
+    catch (error) { notice(error.message, true); }
+  });
+  cell.append(open);
+  if (row.status !== '已发布') {
+    const publish = el('button', '按场核对并发布', 'btn btn--primary');
+    publish.type = 'button';
+    publish.addEventListener('click', async () => {
+      publish.disabled = true;
+      try {
+        const body = {};
+        const book = byId('correction-book').value.trim();
+        if (book) body.book = book;
+        const response = await query(`/api/correction/${row.id}/publish`, body);
+        notice(response.published ? '冲销单已发布' : '冲销单此前已发布');
+        showCorrection(response.voucher);
+        await render();
+      } catch (error) { notice(error.message, true); }
+      finally { publish.disabled = false; }
+    });
+    cell.append(publish);
+  }
+  return cell;
+}
+
+byId('correction').addEventListener('submit', async event => {
+  event.preventDefault();
+  const runId = result.manifest.run_id;
+  const payload = {
+    target: byId('correction-target').value.trim(),
+    note: byId('correction-note').value,
+    data: byId('correction-csv').value,
+  };
+  const book = byId('correction-book').value.trim();
+  if (book) payload.book = book;
+  try {
+    const response = await query(`/api/corrections/${runId}`, payload);
+    notice(response.created ? '冲销单已生成，外账按场核对通过后才能发布' : '同一更正已登记，返回既有冲销单');
+    showCorrection(response.voucher);
+    byId('correction-note').value = '';
+    await render();
+  } catch (error) { notice(error.message, true); }
 });
 render();

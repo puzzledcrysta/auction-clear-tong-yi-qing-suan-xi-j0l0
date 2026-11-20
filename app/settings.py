@@ -12,4 +12,4 @@ ROLE = '再生资源交易市场结算员'
 UNIT = '元'
 RULE_VERSION = 'auction-clear-1.0'
 SIGNATURE = '成交配给'
-TABS = {'intake': '场次报单', 'contract': '报价字段', 'quality': '争议报单', 'domain': '竞价清算', 'reconcile': '结算清单', 'runs': '交易批次', 'review': '市场签核'}
+TABS = {'intake': '场次报单', 'contract': '报价字段', 'quality': '争议报单', 'domain': '竞价清算', 'reconcile': '结算清单', 'runs': '交易批次', 'review': '市场签核', 'correction': '晚到更正'}

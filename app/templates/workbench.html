@@ -38,6 +38,14 @@
         <div class="actions"><label>结论 <select id="decision"><option>确认</option><option>退回</option></select></label>
         <button class="btn btn--primary" type="submit">提交复核</button></div>
       </form>
+      <form id="correction" class="panel__body" hidden>
+        <p class="empty" id="correction-hint">批次须先在「市场签核」确认后，才能登记晚到更正。</p>
+        <label>更正场次 <input id="correction-target" type="text" maxlength="80" placeholder="如 00102"></label>
+        <label>更正原因 <textarea id="correction-note" maxlength="500" rows="2" placeholder="说明哪条报单填错、晚到原因"></textarea></label>
+        <label>更正后来源 CSV <textarea id="correction-csv" rows="5" placeholder="粘贴完整来源；除目标场次外其余行须与原批次逐行一致"></textarea></label>
+        <label>外账（可空，缺省沿用原批次） <textarea id="correction-book" rows="3" placeholder="补登外账后可在冲销单上重新按场核对"></textarea></label>
+        <div class="actions"><button class="btn btn--primary" type="submit">登记更正并生成冲销单</button></div>
+      </form>
     </section>
 
     <section class="panel source" aria-labelledby="input-title">

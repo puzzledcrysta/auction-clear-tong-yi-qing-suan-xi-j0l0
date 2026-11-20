@@ -13,6 +13,21 @@ CREATE TABLE IF NOT EXISTS reviews (
   decision TEXT NOT NULL, note TEXT NOT NULL, changed TEXT NOT NULL,
   PRIMARY KEY(run_id,version)
 );
+CREATE TABLE IF NOT EXISTS corrections (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id),
+  target TEXT NOT NULL,
+  note TEXT NOT NULL,
+  source BLOB NOT NULL,
+  book BLOB NOT NULL,
+  source_sha256 TEXT NOT NULL,
+  book_sha256 TEXT NOT NULL,
+  status TEXT NOT NULL,
+  voucher TEXT NOT NULL,
+  created TEXT NOT NULL,
+  published TEXT,
+  UNIQUE(run_id,target,source_sha256,book_sha256)
+);
 """
 
 
